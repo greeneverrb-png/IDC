@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Identify Chords</title>
+
+<style>
+:root{
+  --bg:#0b0e1a;
+  --card:#151a33;
+  --accent:#00e0ff;
+  --muted:#9aa0c7;
+}
+
+body{
+  margin:0;
+  font-family:system-ui, sans-serif;
+  background:var(--bg);
+  color:white;
+}
+
+header{
+  text-align:center;
+  padding:14px;
+  font-size:20px;
+  font-weight:600;
+}
+
+.container{
+  padding:14px;
+  max-width:900px;
+  margin:auto;
+}
+
+.card{
+  background:var(--card);
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:14px;
+}
+
+input[type=file]{
+  width:100%;
+  background:#22286a;
+  border:none;
+  padding:10px;
+  border-radius:10px;
+  color:white;
+}
+
+button, select{
+  background:#22286a;
+  border:none;
+  padding:8px 12px;
+  border-radius:8px;
+  color:white;
+  cursor:pointer;
+}
+
+button:hover{ background:#3139a8; }
+
+.controls{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+
+/* PLAYER */
+.progress input{ width:100%; }
+
+.time{
+  font-size:12px;
+  color:var(--muted);
+  display:flex;
+  justify-content:space-between;
+}
+
+/* CHORD VIEW */
+.chord-box{ position:relative; }
+
+.full-btn{
+  position:absolute;
+  top:10px;
+  right:10px;
+  font-size:12px;
+}
+
+.chords{
+  height:160px;
+  background:#060914;
+  border-radius:12px;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+}
+
+.scroll{
+  display:flex;
+  gap:50px;
+  padding-left:20px;
+  animation: scroll 18s linear infinite;
+}
+
+.chord{
+  font-size:32px;
+  font-weight:700;
+  color:#7a80b5;
+  transition:all .3s ease;
+}
+
+.chord.active{
+  color:var(--accent);
+  transform:scale(1.4);
+  text-shadow:0 0 12px rgba(0,224,255,.6);
+}
+
+@keyframes scroll{
+  from{ transform:translateX(0); }
+  to{ transform:translateX(-50%); }
+}
+
+/* FULLSCREEN */
+.fullscreen{
+  position:fixed;
+  inset:0;
+  background:black;
+  z-index:999;
+  padding:20px;
+}
+
+.fullscreen .chords{ height:100%; }
+.fullscreen .chord{ font-size:64px; }
+.fullscreen .scroll{ animation-duration:28s; }
+</style>
+</head>
+
+<body>
+
+<header>🎸 Identify Chords</header>
+
+<div class="container">
+
+  <!-- Upload -->
+  <div class="card">
+    <input type="file" id="file" accept=".mp3,audio/mpeg">
+  </div>
+
+  <!-- Player -->
+  <div class="card">
+    <div class="controls">
+      <button onclick="rewind()">⏪</button>
+      <button onclick="playPause()">▶️ / ⏸</button>
+      <button onclick="forward()">⏩</button>
+      <button onclick="mute()">🔇</button>
+
+      <select>
+        <option>C</option>
+        <option>D</option>
+        <option>E</option>
+        <option>F</option>
+        <option selected>C#m</option>
+      </select>
+    </div>
+
+    <div class="progress">
+      <input type="range" id="seek" value="0">
+      <div class="time">
+        <span id="cur">0:00</span>
+        <span id="dur">0:00</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chords -->
+  <div class="card chord-box" id="chordCard">
+    <button class="full-btn" onclick="toggleFull()">⛶ Full</button>
+
+    <div class="chords">
+      <div class="scroll">
+        <div class="chord active">C#m</div>
+        <div class="chord">A</div>
+        <div class="chord">E</div>
+        <div class="chord">B</div>
+        <div class="chord">C#m</div>
+        <div class="chord">A</div>
+        <div class="chord">E</div>
+        <div class="chord">B</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<audio id="audio"></audio>
+
+<script>
+const audio = document.getElementById("audio");
+const file = document.getElementById("file");
+const seek = document.getElementById("seek");
+const cur = document.getElementById("cur");
+const dur = document.getElementById("dur");
+const card = document.getElementById("chordCard");
+
+file.addEventListener("change", e=>{
+  const f = e.target.files[0];
+  if(!f || !f.name.toLowerCase().endsWith(".mp3")){
+    alert("MP3 file matra upload garnus");
+    file.value="";
+    return;
+  }
+  audio.src = URL.createObjectURL(f);
+  audio.load();
+});
+
+audio.addEventListener("timeupdate", ()=>{
+  if(audio.duration){
+    seek.value = (audio.currentTime / audio.duration) * 100;
+    cur.textContent = formatTime(audio.currentTime);
+  }
+});
+
+audio.addEventListener("loadedmetadata", ()=>{
+  dur.textContent = formatTime(audio.duration);
+});
+
+seek.addEventListener("input", ()=>{
+  if(audio.duration){
+    audio.currentTime = (seek.value / 100) * audio.duration;
+  }
+});
+
+function playPause(){
+  audio.paused ? audio.play() : audio.pause();
+}
+function rewind(){ audio.currentTime = Math.max(0, audio.currentTime - 2); }
+function forward(){ audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 2); }
+function mute(){ audio.muted = !audio.muted; }
+
+function formatTime(t){
+  const m = Math.floor(t / 60);
+  const s = Math.floor(t % 60).toString().padStart(2,"0");
+  return `${m}:${s}`;
+}
+
+function toggleFull(){
+  card.classList.toggle("fullscreen");
+}
+</script>
+
+</body>
+</html>
