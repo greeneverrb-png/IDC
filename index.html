@@ -3,28 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Identify Chords & Accurate Tempo</title>
+<title>Chord Visualizer & Tempo Sync</title>
 <style>
 body{margin:0;background:#0b0e1a;color:white;font-family:system-ui,sans-serif}
-header{text-align:center;padding:12px;font-size:18px;font-weight:600}
+header{text-align:center;padding:12px;font-size:20px;font-weight:600}
 .container{padding:12px;max-width:900px;margin:auto}
 .card{background:#151a33;border-radius:14px;padding:14px;margin-bottom:12px}
-button,input,select{background:#22286a;border:none;border-radius:10px;color:white;padding:14px;font-size:16px}
+button,input,select{background:#22286a;border:none;border-radius:10px;color:white;padding:12px;font-size:16px;cursor:pointer}
 button:disabled{opacity:.4}
 .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .chords{height:160px;background:#050714;border-radius:12px;display:flex;align-items:center;overflow:hidden;position:relative}
-.scroll{display:flex;gap:60px;transition:transform .4s ease}
+.scroll{display:flex;gap:60px;transition:transform .2s ease}
 .chord{font-size:34px;color:#777db8;font-weight:700;transition:all .3s ease}
-.chord.active{color:#00e0ff;transform:scale(1.5);text-shadow:0 0 14px rgba(0,224,255,.6)}
+.chord.active{color:#00e0ff;font-size:64px;font-weight:900;text-shadow:0 0 20px rgba(0,224,255,.8)}
 .fullscreen{position:fixed;inset:0;background:black;z-index:999;padding:20px}
-.fullscreen .chord{font-size:70px}
+.fullscreen .chord{font-size:90px}
 .full-controls{position:absolute;top:10px;left:10px;display:flex;gap:10px;z-index:1000}
 .time{font-size:12px;color:#aaa;display:flex;justify-content:space-between}
 #tempoDisplay{margin-left:10px;font-weight:600}
 </style>
 </head>
 <body>
-<header>🎸 Identify Chords & Accurate Tempo</header>
+<header>🎸 Chord Visualizer & Tempo Sync</header>
 <div class="container">
 <div class="card">
   <input type="file" id="audioFile" accept=".mp3">
@@ -55,6 +55,7 @@ button:disabled{opacity:.4}
 <audio id="audio"></audio>
 <script>
 const audio=document.getElementById('audio');
+const audioFile=document.getElementById('audioFile');
 const playBtn=document.getElementById('play');
 const fsPlayBtn=document.getElementById('fsPlay');
 const scroll=document.getElementById('scroll');
@@ -63,11 +64,11 @@ const cur=document.getElementById('cur');
 const dur=document.getElementById('dur');
 const detected=document.getElementById('detected');
 const scaleSelect=document.getElementById('scaleSelect');
-const chordCard=document.getElementById('chordCard');
-const tempoBtn=document.getElementById('tempoBtn');
-const tempoDisplay=document.getElementById('tempoDisplay');
 const applyScaleBtn=document.getElementById('applyScale');
 const resetScaleBtn=document.getElementById('resetScale');
+const tempoBtn=document.getElementById('tempoBtn');
+const tempoDisplay=document.getElementById('tempoDisplay');
+const chordCard=document.getElementById('chordCard');
 
 const NOTES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 let chords=[], originalChords=[];
@@ -77,15 +78,14 @@ let tempoActive=false, bpm=0, audioCtx=null, tempoInterval=null;
 // populate scale select
 NOTES.forEach(n=>{const o=document.createElement('option'); o.value=n; o.textContent=n; scaleSelect.appendChild(o);});
 
-// handle file upload
+// file upload
 audioFile.onchange=e=>{
  const file=e.target.files[0];
  if(!file) return;
  audio.src=URL.createObjectURL(file);
  audio.load();
  chords=[]; originalChords=[]; scroll.innerHTML=''; playBtn.disabled=true;
- detected.textContent='Scale: -';
- tempoDisplay.textContent='- BPM'; tempoActive=false;
+ detected.textContent='Scale: -'; tempoDisplay.textContent='- BPM'; tempoActive=false;
  clearInterval(tempoInterval);
 };
 
@@ -93,7 +93,7 @@ audio.onloadedmetadata=()=>{
  dur.textContent=format(audio.duration);
  playBtn.disabled=false;
  detectRootScale();
- generateApproxChords();
+ generateChordTimeline();
  detectBPM();
 };
 
@@ -130,15 +130,19 @@ function scrollChords(){
  scroll.style.transform=`translateX(${translateX}px)`;
 }
 
-// detect root scale
+// root scale detect (approximate for demo)
 function detectRootScale(){
- detectedScale=NOTES[Math.floor(Math.random()*NOTES.length)];
+ const counts = {};
+ NOTES.forEach(n=>counts[n]=0);
+ chords.forEach(c=>{if(counts[c.chord]!==undefined) counts[c.chord]++});
+ const maxChord = Object.keys(counts).reduce((a,b)=>counts[a]>counts[b]?a:b, 'C');
+ detectedScale=maxChord;
  detected.textContent='Scale: '+detectedScale;
  scaleSelect.value=detectedScale;
 }
 
-// generate approx chords for song duration
-function generateApproxChords(){
+// generate chord timeline (demo approximate)
+function generateChordTimeline(){
  chords=[]; scroll.innerHTML='';
  const step=4;
  for(let t=0;t<audio.duration;t+=step){
@@ -164,46 +168,17 @@ function renderChords(){scroll.innerHTML=''; chords.forEach(c=>{const d=document
 function toggleFull(){chordCard.classList.toggle('fullscreen');}
 function format(t){const m=Math.floor(t/60); const s=Math.floor(t%60).toString().padStart(2,'0'); return `${m}:${s}`;}
 
-// BPM detection using Web Audio API (simple peak-based approx)
+// BPM detection placeholder (for demo, to replace with real analysis library)
 function detectBPM(){
- const audioContext = new (window.AudioContext || window.webkitAudioContext)();
- const source = audioContext.createMediaElementSource(audio);
- const analyser = audioContext.createAnalyser();
- source.connect(analyser);
- analyser.connect(audioContext.destination);
- analyser.fftSize=2048;
- const bufferLength = analyser.fftSize;
- const dataArray = new Uint8Array(bufferLength);
- let peaks = [];
- let lastTime = audio.currentTime;
- function checkPeaks(){
-  analyser.getByteTimeDomainData(dataArray);
-  for(let i=1;i<bufferLength;i++){
-   if(dataArray[i]>128 && dataArray[i-1]<=128){
-    const now=audio.currentTime;
-    if(now-lastTime>0.3){peaks.push(now); lastTime=now;}
-   }
-  }
-  if(audio.paused) return;
-  requestAnimationFrame(checkPeaks);
- }
- requestAnimationFrame(checkPeaks);
- setTimeout(()=>{
-  if(peaks.length<2){ bpm=90;} else {
-   const intervals=[];
-   for(let i=1;i<peaks.length;i++) intervals.push(peaks[i]-peaks[i-1]);
-   const avg = intervals.reduce((a,b)=>a+b,0)/intervals.length;
-   bpm=Math.round(60/avg);
-  }
-  tempoDisplay.textContent=bpm+' BPM';
- },5000); // detect after few sec playback
+ bpm=90; // demo default, replace with analysis
+ tempoDisplay.textContent=bpm+' BPM';
 }
 
 // tick-tock metronome
 function startTempo(){
  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
  tempoActive=true;
- let interval=60000/bpm;
+ const interval=60000/bpm;
  tempoInterval=setInterval(()=>{
   if(!audio.paused){
    const osc=audioCtx.createOscillator();
@@ -211,15 +186,12 @@ function startTempo(){
    const gain=audioCtx.createGain(); gain.gain.value=0.2;
    osc.connect(gain); gain.connect(audioCtx.destination);
    osc.start(); osc.stop(audioCtx.currentTime+0.05);
-   highlightChordBeat();
+   scrollChords();
   }
  },interval);
 }
 function stopTempo(){clearInterval(tempoInterval); tempoActive=false;}
 tempoBtn.onclick=()=>{if(!tempoActive) startTempo(); else stopTempo();}
-function highlightChordBeat(){
- scrollChords();
-}
 </script>
 </body>
 </html>
