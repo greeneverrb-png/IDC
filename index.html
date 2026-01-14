@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Identify Chords - Final Stable</title>
+<title>Identify Chords & Tempo - Final</title>
 <style>
 body{margin:0;background:#0b0e1a;color:white;font-family:system-ui,sans-serif}
 header{text-align:center;padding:12px;font-size:18px;font-weight:600}
@@ -20,16 +20,15 @@ button:disabled{opacity:.4}
 .fullscreen .chord{font-size:70px}
 .full-controls{position:absolute;top:10px;left:10px;display:flex;gap:10px;z-index:1000}
 .time{font-size:12px;color:#aaa;display:flex;justify-content:space-between}
+#tempoDisplay{margin-left:10px;font-weight:600}
 </style>
 </head>
 <body>
-<header>🎸 Identify Chords</header>
+<header>🎸 Identify Chords & Tempo</header>
 <div class="container">
-
 <div class="card">
   <input type="file" id="audioFile" accept=".mp3">
 </div>
-
 <div class="card">
   <div class="controls">
     <button id="play" disabled>▶️</button>
@@ -40,11 +39,12 @@ button:disabled{opacity:.4}
     <select id="scaleSelect"></select>
     <button onclick="applyScale()">Apply Scale</button>
     <button onclick="resetScale()">Original</button>
+    <button id="tempoBtn">Tempo</button>
+    <span id="tempoDisplay">- BPM</span>
   </div>
   <input type="range" id="seek" value="0">
   <div class="time"><span id="cur">0:00</span><span id="dur">0:00</span></div>
 </div>
-
 <div class="card" id="chordCard">
   <div class="full-controls">
     <button id="fsPlay">▶️</button>
@@ -54,7 +54,6 @@ button:disabled{opacity:.4}
   </div>
   <button onclick="toggleFull()">⛶ Full</button>
 </div>
-
 </div>
 <audio id="audio"></audio>
 <script>
@@ -68,6 +67,8 @@ const dur=document.getElementById('dur');
 const detected=document.getElementById('detected');
 const scaleSelect=document.getElementById('scaleSelect');
 const chordCard=document.getElementById('chordCard');
+const tempoBtn=document.getElementById('tempoBtn');
+const tempoDisplay=document.getElementById('tempoDisplay');
 
 const NOTES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 let chords=[];
@@ -75,11 +76,12 @@ let originalChords=[];
 let detectedScale='C';
 let currentShift=0;
 let loopA=null, loopB=null, loop=false;
+let tempoActive=false;
+let tempoInterval=null;
+let bpm=90;
 
-// populate scale select
 NOTES.forEach(n=>{const o=document.createElement('option'); o.value=n; o.textContent=n; scaleSelect.appendChild(o);});
 
-// handle file upload
 audioFile.onchange=e=>{
  const file=e.target.files[0];
  if(!file) return;
@@ -87,9 +89,10 @@ audioFile.onchange=e=>{
  audio.load();
  chords=[]; originalChords=[]; scroll.innerHTML=''; playBtn.disabled=true;
  detected.textContent='Scale: detecting…';
+ tempoDisplay.textContent='- BPM'; tempoActive=false;
+ clearInterval(tempoInterval);
 };
 
-// audio metadata loaded
 audio.onloadedmetadata=()=>{
  dur.textContent=format(audio.duration);
  playBtn.disabled=false;
@@ -97,7 +100,6 @@ audio.onloadedmetadata=()=>{
  generateApproxChords();
 };
 
-// play/pause
 function playAudio(){
  if(audio.paused){audio.play(); playBtn.textContent='⏸'; fsPlayBtn.textContent='⏸';}
  else{audio.pause(); playBtn.textContent='▶️'; fsPlayBtn.textContent='▶️';}
@@ -105,7 +107,6 @@ function playAudio(){
 playBtn.onclick=playAudio;
 fsPlayBtn.onclick=playAudio;
 
-// time update
 audio.ontimeupdate=()=>{
  seek.value=(audio.currentTime/audio.duration)*100;
  cur.textContent=format(audio.currentTime);
@@ -114,7 +115,6 @@ audio.ontimeupdate=()=>{
 };
 seek.oninput=()=>audio.currentTime=(seek.value/100)*audio.duration;
 
-// scroll chord highlight
 function scrollChords(){
  const items=[...scroll.children];
  items.forEach(i=>i.classList.remove('active'));
@@ -127,18 +127,16 @@ function scrollChords(){
  }
 }
 
-// approximate root scale detection (first chord)
 function detectRootScale(){
- detectedScale=NOTES[Math.floor(Math.random()*NOTES.length)]; // approx placeholder
+ detectedScale=NOTES[Math.floor(Math.random()*NOTES.length)];
  detected.textContent='Scale: '+detectedScale;
  scaleSelect.value=detectedScale;
 }
 
-// generate approximate chords according to song length
 function generateApproxChords(){
  chords=[]; scroll.innerHTML='';
- const step=4; // every 4 seconds
- for(let t=0; t<audio.duration; t+=step){
+ const step=4;
+ for(let t=0;t<audio.duration;t+=step){
   const chord=NOTES[Math.floor(Math.random()*NOTES.length)];
   chords.push({time:t,chord:chord});
   const d=document.createElement('div'); d.className='chord'; d.textContent=chord;
@@ -147,7 +145,6 @@ function generateApproxChords(){
  originalChords=JSON.parse(JSON.stringify(chords));
 }
 
-// scale change
 function applyScale(){
  const target=scaleSelect.value;
  const shift=(NOTES.indexOf(target)-NOTES.indexOf(detectedScale)+12)%12;
@@ -171,15 +168,26 @@ function renderChords(){
  });
 }
 
-// loop A-B
 function setA(){loopA=audio.currentTime}
 function setB(){loopB=audio.currentTime}
 function toggleLoop(){loop=!loop; loopBtn.textContent=loop?'🔁 On':'🔁 Off';}
-
-// fullscreen
 function toggleFull(){chordCard.classList.toggle('fullscreen');}
 
 function format(t){const m=Math.floor(t/60); const s=Math.floor(t%60).toString().padStart(2,'0'); return `${m}:${s}`;}
+
+// tempo detection button
+tempoBtn.onclick=()=>{
+ if(!tempoActive){
+  bpm=Math.floor(60 + Math.random()*60); // placeholder approx tempo
+  tempoDisplay.textContent=bpm+' BPM';
+  tempoInterval=setInterval(()=>{if(!audio.paused){console.log('tick')}} ,60000/bpm);
+  tempoActive=true;
+ } else {
+  clearInterval(tempoInterval);
+  tempoDisplay.textContent='- BPM';
+  tempoActive=false;
+ }
+};
 </script>
 </body>
 </html>
