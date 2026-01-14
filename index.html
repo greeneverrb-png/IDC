@@ -36,7 +36,7 @@ header{
 .card{
   background:var(--card);
   border-radius:14px;
-  padding:14px;
+  padding:16px;
   margin-bottom:14px;
 }
 
@@ -44,30 +44,42 @@ input[type=file]{
   width:100%;
   background:#22286a;
   border:none;
-  padding:10px;
+  padding:12px;
   border-radius:10px;
   color:white;
+}
+
+/* CONTROLS */
+.controls{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
 }
 
 button, select{
   background:#22286a;
   border:none;
-  padding:8px 12px;
-  border-radius:8px;
+  padding:14px 18px;
+  border-radius:10px;
   color:white;
   cursor:pointer;
+  font-size:16px;
 }
 
-button:hover{ background:#3139a8; }
-
-.controls{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  align-items:center;
+button:disabled{
+  opacity:.4;
+  cursor:not-allowed;
 }
 
-/* PLAYER */
+button:hover:not(:disabled){ background:#3139a8; }
+
+select{
+  min-width:120px;
+  font-size:16px;
+}
+
+/* PROGRESS */
 .progress input{ width:100%; }
 
 .time{
@@ -85,6 +97,7 @@ button:hover{ background:#3139a8; }
   top:10px;
   right:10px;
   font-size:12px;
+  padding:8px 10px;
 }
 
 .chords{
@@ -100,14 +113,16 @@ button:hover{ background:#3139a8; }
   display:flex;
   gap:50px;
   padding-left:20px;
+}
+
+.scroll.playing{
   animation: scroll 18s linear infinite;
 }
 
 .chord{
-  font-size:32px;
+  font-size:34px;
   font-weight:700;
   color:#7a80b5;
-  transition:all .3s ease;
 }
 
 .chord.active{
@@ -132,7 +147,7 @@ button:hover{ background:#3139a8; }
 
 .fullscreen .chords{ height:100%; }
 .fullscreen .chord{ font-size:64px; }
-.fullscreen .scroll{ animation-duration:28s; }
+.fullscreen .scroll.playing{ animation-duration:28s; }
 </style>
 </head>
 
@@ -144,22 +159,23 @@ button:hover{ background:#3139a8; }
 
   <!-- Upload -->
   <div class="card">
-    <input type="file" id="file" accept=".mp3,audio/mpeg">
+    <input type="file" id="file" accept=".mp3">
   </div>
 
   <!-- Player -->
   <div class="card">
     <div class="controls">
-      <button onclick="rewind()">⏪</button>
-      <button onclick="playPause()">▶️ / ⏸</button>
-      <button onclick="forward()">⏩</button>
-      <button onclick="mute()">🔇</button>
+      <button id="rew" onclick="rewind()" disabled>⏪</button>
+      <button id="play" onclick="playPause()" disabled>▶️</button>
+      <button id="fwd" onclick="forward()" disabled>⏩</button>
+      <button id="mute" onclick="mute()" disabled>🔇</button>
+
+      <button id="loopBtn" onclick="toggleLoop()">🔁 Off</button>
 
       <select>
-        <option>C</option>
-        <option>D</option>
-        <option>E</option>
-        <option>F</option>
+        <option>C</option><option>D</option><option>E</option>
+        <option>F</option><option>G</option>
+        <option>A</option><option>B</option>
         <option selected>C#m</option>
       </select>
     </div>
@@ -178,7 +194,7 @@ button:hover{ background:#3139a8; }
     <button class="full-btn" onclick="toggleFull()">⛶ Full</button>
 
     <div class="chords">
-      <div class="scroll">
+      <div class="scroll" id="scroll">
         <div class="chord active">C#m</div>
         <div class="chord">A</div>
         <div class="chord">E</div>
@@ -201,51 +217,73 @@ const file = document.getElementById("file");
 const seek = document.getElementById("seek");
 const cur = document.getElementById("cur");
 const dur = document.getElementById("dur");
-const card = document.getElementById("chordCard");
+const scroll = document.getElementById("scroll");
 
-file.addEventListener("change", e=>{
+const controls = ["rew","play","fwd","mute"].map(id=>document.getElementById(id));
+const playBtn = document.getElementById("play");
+const loopBtn = document.getElementById("loopBtn");
+
+let loop = false;
+
+/* LOAD */
+file.onchange = e=>{
   const f = e.target.files[0];
   if(!f || !f.name.toLowerCase().endsWith(".mp3")){
     alert("MP3 file matra upload garnus");
-    file.value="";
     return;
   }
   audio.src = URL.createObjectURL(f);
   audio.load();
-});
+};
 
-audio.addEventListener("timeupdate", ()=>{
-  if(audio.duration){
-    seek.value = (audio.currentTime / audio.duration) * 100;
-    cur.textContent = formatTime(audio.currentTime);
-  }
-});
+/* ENABLE AFTER LOAD */
+audio.onloadedmetadata = ()=>{
+  dur.textContent = format(audio.duration);
+  controls.forEach(b=>b.disabled=false);
+};
 
-audio.addEventListener("loadedmetadata", ()=>{
-  dur.textContent = formatTime(audio.duration);
-});
-
-seek.addEventListener("input", ()=>{
-  if(audio.duration){
-    audio.currentTime = (seek.value / 100) * audio.duration;
-  }
-});
-
+/* PLAY / PAUSE */
 function playPause(){
-  audio.paused ? audio.play() : audio.pause();
+  if(audio.paused){
+    audio.play();
+    playBtn.textContent="⏸";
+    scroll.classList.add("playing");
+  }else{
+    audio.pause();
+    playBtn.textContent="▶️";
+    scroll.classList.remove("playing");
+  }
 }
-function rewind(){ audio.currentTime = Math.max(0, audio.currentTime - 2); }
-function forward(){ audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 2); }
-function mute(){ audio.muted = !audio.muted; }
 
-function formatTime(t){
-  const m = Math.floor(t / 60);
-  const s = Math.floor(t % 60).toString().padStart(2,"0");
+/* LOOP */
+function toggleLoop(){
+  loop = !loop;
+  audio.loop = loop;
+  loopBtn.textContent = loop ? "🔁 On" : "🔁 Off";
+}
+
+/* TIME */
+audio.ontimeupdate = ()=>{
+  seek.value = (audio.currentTime/audio.duration)*100 || 0;
+  cur.textContent = format(audio.currentTime);
+};
+
+seek.oninput = ()=>{
+  audio.currentTime = (seek.value/100)*audio.duration;
+};
+
+function rewind(){ audio.currentTime=Math.max(0,audio.currentTime-2); }
+function forward(){ audio.currentTime=Math.min(audio.duration,audio.currentTime+2); }
+function mute(){ audio.muted=!audio.muted; }
+
+function format(t){
+  const m=Math.floor(t/60);
+  const s=Math.floor(t%60).toString().padStart(2,"0");
   return `${m}:${s}`;
 }
 
 function toggleFull(){
-  card.classList.toggle("fullscreen");
+  document.getElementById("chordCard").classList.toggle("fullscreen");
 }
 </script>
 
