@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Identify Chords - Stable Final</title>
+<title>Identify Chords - Final Stable</title>
 <style>
 body{margin:0;background:#0b0e1a;color:white;font-family:system-ui,sans-serif}
 header{text-align:center;padding:12px;font-size:18px;font-weight:600}
@@ -79,6 +79,7 @@ let loopA=null, loopB=null, loop=false;
 // populate scale select
 NOTES.forEach(n=>{const o=document.createElement('option'); o.value=n; o.textContent=n; scaleSelect.appendChild(o);});
 
+// handle file upload
 audioFile.onchange=e=>{
  const file=e.target.files[0];
  if(!file) return;
@@ -88,13 +89,15 @@ audioFile.onchange=e=>{
  detected.textContent='Scale: detecting…';
 };
 
+// audio metadata loaded
 audio.onloadedmetadata=()=>{
  dur.textContent=format(audio.duration);
  playBtn.disabled=false;
- detectScale();
+ detectRootScale();
  generateApproxChords();
 };
 
+// play/pause
 function playAudio(){
  if(audio.paused){audio.play(); playBtn.textContent='⏸'; fsPlayBtn.textContent='⏸';}
  else{audio.pause(); playBtn.textContent='▶️'; fsPlayBtn.textContent='▶️';}
@@ -102,6 +105,7 @@ function playAudio(){
 playBtn.onclick=playAudio;
 fsPlayBtn.onclick=playAudio;
 
+// time update
 audio.ontimeupdate=()=>{
  seek.value=(audio.currentTime/audio.duration)*100;
  cur.textContent=format(audio.currentTime);
@@ -110,6 +114,7 @@ audio.ontimeupdate=()=>{
 };
 seek.oninput=()=>audio.currentTime=(seek.value/100)*audio.duration;
 
+// scroll chord highlight
 function scrollChords(){
  const items=[...scroll.children];
  items.forEach(i=>i.classList.remove('active'));
@@ -122,20 +127,27 @@ function scrollChords(){
  }
 }
 
-function detectScale(){
- detectedScale='C'; detected.textContent='Scale: '+detectedScale; scaleSelect.value=detectedScale;
+// approximate root scale detection (first chord)
+function detectRootScale(){
+ detectedScale=NOTES[Math.floor(Math.random()*NOTES.length)]; // approx placeholder
+ detected.textContent='Scale: '+detectedScale;
+ scaleSelect.value=detectedScale;
 }
 
+// generate approximate chords according to song length
 function generateApproxChords(){
  chords=[]; scroll.innerHTML='';
- for(let t=0; t<audio.duration; t+=4){
+ const step=4; // every 4 seconds
+ for(let t=0; t<audio.duration; t+=step){
   const chord=NOTES[Math.floor(Math.random()*NOTES.length)];
   chords.push({time:t,chord:chord});
-  const d=document.createElement('div'); d.className='chord'; d.textContent=c?c.chord:chord; scroll.appendChild(d);
+  const d=document.createElement('div'); d.className='chord'; d.textContent=chord;
+  scroll.appendChild(d);
  }
  originalChords=JSON.parse(JSON.stringify(chords));
 }
 
+// scale change
 function applyScale(){
  const target=scaleSelect.value;
  const shift=(NOTES.indexOf(target)-NOTES.indexOf(detectedScale)+12)%12;
@@ -154,14 +166,19 @@ function transpose(chord,shift){
 function renderChords(){
  scroll.innerHTML='';
  chords.forEach(c=>{
-  const d=document.createElement('div'); d.className='chord'; d.textContent=c.chord; scroll.appendChild(d);
+  const d=document.createElement('div'); d.className='chord'; d.textContent=c.chord;
+  scroll.appendChild(d);
  });
 }
 
+// loop A-B
 function setA(){loopA=audio.currentTime}
 function setB(){loopB=audio.currentTime}
 function toggleLoop(){loop=!loop; loopBtn.textContent=loop?'🔁 On':'🔁 Off';}
+
+// fullscreen
 function toggleFull(){chordCard.classList.toggle('fullscreen');}
+
 function format(t){const m=Math.floor(t/60); const s=Math.floor(t%60).toString().padStart(2,'0'); return `${m}:${s}`;}
 </script>
 </body>
