@@ -4,223 +4,184 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Identify Chords</title>
-
 <style>
-:root{
-  --bg:#0b0e1a;
-  --card:#151a33;
-  --accent:#00e0ff;
-  --muted:#9aa0c7;
-}
-
-body{
-  margin:0;
-  font-family:system-ui,sans-serif;
-  background:var(--bg);
-  color:white;
-}
-
-header{
-  text-align:center;
-  padding:14px;
-  font-size:20px;
-  font-weight:600;
-}
-
-.container{max-width:900px;margin:auto;padding:14px;}
-.card{background:var(--card);border-radius:14px;padding:16px;margin-bottom:14px;}
-
-button,select,input[type=file]{
-  background:#22286a;
-  border:none;
-  border-radius:10px;
-  color:white;
-  padding:14px 18px;
-  font-size:16px;
-}
-
+body{margin:0;background:#0b0e1a;color:white;font-family:system-ui,sans-serif}
+header{text-align:center;padding:12px;font-size:18px;font-weight:600}
+.container{padding:12px;max-width:900px;margin:auto}
+.card{background:#151a33;border-radius:14px;padding:14px;margin-bottom:12px}
+button,input,select{background:#22286a;border:none;border-radius:10px;color:white;padding:14px;font-size:16px}
 button:disabled{opacity:.4}
 .controls{display:flex;gap:10px;flex-wrap:wrap}
-
-.chords{
-  height:160px;
-  background:#060914;
-  border-radius:12px;
-  display:flex;
-  align-items:center;
-  overflow:hidden;
-}
-
-.scroll{
-  display:flex;
-  gap:60px;
-  padding-left:20px;
-}
-
-.chord{
-  font-size:36px;
-  font-weight:700;
-  color:#6c72a8;
-}
-
-.chord.active{
-  color:var(--accent);
-  transform:scale(1.5);
-  text-shadow:0 0 14px rgba(0,224,255,.6);
-}
-
-.fullscreen{
-  position:fixed;
-  inset:0;
-  background:black;
-  z-index:999;
-  padding:20px;
-}
-
+.chords{height:160px;background:#050714;border-radius:12px;display:flex;align-items:center;overflow:hidden}
+.scroll{display:flex;gap:60px;padding-left:20px;transition:transform .2s}
+.chord{font-size:34px;color:#777db8;font-weight:700}
+.chord.active{color:#00e0ff;transform:scale(1.5);text-shadow:0 0 14px rgba(0,224,255,.6)}
+.fullscreen{position:fixed;inset:0;background:black;z-index:999;padding:20px}
 .fullscreen .chord{font-size:70px}
-
-.time{font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
+.time{font-size:12px;color:#aaa;display:flex;justify-content:space-between}
+.list{font-size:14px;line-height:1.6}
+.list div{border-bottom:1px solid #2a2f66;padding:4px 0}
 </style>
 </head>
-
 <body>
-
 <header>🎸 Identify Chords</header>
-
 <div class="container">
-
-<div class="card">
-  <input type="file" id="file" accept=".mp3">
-</div>
-
+<div class="card"><input type="file" id="audioFile" accept=".mp3"></div>
 <div class="card">
   <div class="controls">
     <button id="play" disabled>▶️</button>
-    <button id="loopA">Set A</button>
-    <button id="loopB">Set B</button>
-    <button id="loopToggle">🔁 Off</button>
-
-    <select id="scale">
-      <option>C</option><option>C#</option><option>D</option><option>D#</option>
-      <option>E</option><option>F</option><option>F#</option><option>G</option>
-      <option>G#</option><option>A</option><option>A#</option><option>B</option>
-      <option>Cm</option><option>C#m</option><option>Dm</option><option>D#m</option>
-      <option>Em</option><option>Fm</option><option>F#m</option><option>Gm</option>
-      <option>G#m</option><option>Am</option><option>A#m</option><option>Bm</option>
-    </select>
+    <button onclick="setA()">Set A</button>
+    <button onclick="setB()">Set B</button>
+    <button id="loopBtn" onclick="toggleLoop()">🔁 Off</button>
   </div>
-
   <input type="range" id="seek" value="0">
   <div class="time"><span id="cur">0:00</span><span id="dur">0:00</span></div>
 </div>
-
-<div class="card" id="chordCard">
-  <button onclick="toggleFull()">⛶ Full</button>
-  <div class="chords">
-    <div class="scroll" id="scroll"></div>
+<div class="card">
+  <div class="controls">
+    <strong id="detected">Scale: -</strong>
+    <select id="scaleSelect"></select>
+    <button onclick="applyScale()">Apply Scale</button>
+    <button onclick="resetScale()">Original</button>
   </div>
 </div>
-
+<div class="card">
+  <div class="controls">
+    <select id="chordSelect"></select>
+    <button onclick="addChord()">➕ Add Chord</button>
+  </div>
 </div>
-
+<div class="card" id="chordCard">
+  <button onclick="toggleFull()">⛶ Full</button>
+  <div class="chords"><div class="scroll" id="scroll"></div></div>
+</div>
+<div class="card"><h4>Chord Timeline</h4><div class="list" id="list"></div></div>
+<div class="card">
+  <div class="controls">
+    <button onclick="exportJSON()">⬇️ Export JSON</button>
+    <input type="file" id="importJSON" accept=".json">
+  </div>
+</div>
+</div>
 <audio id="audio"></audio>
-
 <script>
-const audio = document.getElementById("audio");
-const playBtn = document.getElementById("play");
-const scroll = document.getElementById("scroll");
-const seek = document.getElementById("seek");
-const cur = document.getElementById("cur");
-const dur = document.getElementById("dur");
+const audio=document.getElementById('audio');
+const playBtn=document.getElementById('play');
+const scroll=document.getElementById('scroll');
+const list=document.getElementById('list');
+const seek=document.getElementById('seek');
+const cur=document.getElementById('cur');
+const dur=document.getElementById('dur');
+const chordSelect=document.getElementById('chordSelect');
+const scaleSelect=document.getElementById('scaleSelect');
+const detected=document.getElementById('detected');
 
-let loopA=null, loopB=null, loopOn=false;
+const NOTES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+let chords=[]; let originalChords=[];
+let detectedScale=null; let currentShift=0;
+let loopA=null,loopB=null,loop=false;
 
-/* EXACT CHORD TIMELINE (sample) */
-const chordTimeline = [
-  {time:0,chord:"C#m"},
-  {time:12,chord:"A"},
-  {time:24,chord:"E"},
-  {time:36,chord:"B"},
-];
+NOTES.forEach(n=>{
+  const o=document.createElement('option');o.value=n;o.textContent=n;scaleSelect.appendChild(o);
+});
 
-/* Load */
-file.onchange=e=>{
-  const f=e.target.files[0];
-  if(!f)return;
-  audio.src=URL.createObjectURL(f);
-  audio.load();
-};
-
-/* Ready */
-audio.onloadedmetadata=()=>{
-  dur.textContent=format(audio.duration);
-  playBtn.disabled=false;
-};
-
-/* Build chords ONLY when play */
-function buildChords(){
-  scroll.innerHTML="";
-  chordTimeline.forEach(c=>{
-    const d=document.createElement("div");
-    d.className="chord";
-    d.textContent=c.chord;
-    scroll.appendChild(d);
+function populateChordSelect(){
+  chordSelect.innerHTML='';
+  NOTES.forEach(n=>{
+    ['','m'].forEach(s=>{
+      const o=document.createElement('option');
+      o.value=n+s;o.textContent=n+s;chordSelect.appendChild(o);
+    });
   });
 }
+populateChordSelect();
 
-/* Play */
+audioFile.onchange=e=>{
+ audio.src=URL.createObjectURL(e.target.files[0]);
+ audio.load();
+ chords=[];originalChords=[];scroll.innerHTML='';list.innerHTML='';playBtn.disabled=true;
+ detected.textContent='Scale: detecting…';
+};
+
+audio.onloadedmetadata=()=>{
+ dur.textContent=format(audio.duration);
+ playBtn.disabled=false;
+};
+
 playBtn.onclick=()=>{
-  if(audio.paused){
-    if(!scroll.children.length) buildChords();
-    audio.play();
-    playBtn.textContent="⏸";
-  }else{
-    audio.pause();
-    playBtn.textContent="▶️";
-  }
+ if(audio.paused){audio.play();playBtn.textContent='⏸';}
+ else{audio.pause();playBtn.textContent='▶️';}
 };
 
-/* Sync */
 audio.ontimeupdate=()=>{
-  seek.value=(audio.currentTime/audio.duration)*100;
-  cur.textContent=format(audio.currentTime);
-
-  const chords=[...scroll.children];
-  chords.forEach(c=>c.classList.remove("active"));
-
-  for(let i=chordTimeline.length-1;i>=0;i--){
-    if(audio.currentTime>=chordTimeline[i].time){
-      chords[i]?.classList.add("active");
-      scroll.style.transform=`translateX(${-i*120}px)`;
-      break;
-    }
-  }
-
-  if(loopOn && loopB && audio.currentTime>=loopB){
-    audio.currentTime=loopA;
-  }
+ seek.value=(audio.currentTime/audio.duration)*100;
+ cur.textContent=format(audio.currentTime);
+ const items=[...scroll.children];items.forEach(i=>i.classList.remove('active'));
+ for(let i=chords.length-1;i>=0;i--){
+  if(audio.currentTime>=chords[i].time){items[i]?.classList.add('active');scroll.style.transform=`translateX(${-i*120}px)`;break;}
+ }
+ if(loop&&loopB&&audio.currentTime>=loopB)audio.currentTime=loopA;
 };
-
-/* Loop A/B */
-loopA.onclick=()=>loopA=audio.currentTime;
-loopB.onclick=()=>loopB=audio.currentTime;
-loopToggle.onclick=()=>{
-  loopOn=!loopOn;
-  loopToggle.textContent=loopOn?"🔁 On":"🔁 Off";
-};
-
 seek.oninput=()=>audio.currentTime=(seek.value/100)*audio.duration;
 
-function format(t){
-  const m=Math.floor(t/60);
-  const s=Math.floor(t%60).toString().padStart(2,"0");
-  return `${m}:${s}`;
+function addChord(){
+ const time=Math.floor(audio.currentTime);
+ const chord=chordSelect.value;
+ chords.push({time,chord});
+ originalChords=JSON.parse(JSON.stringify(chords));
+ detectScale();
+ render();
 }
 
-function toggleFull(){
-  document.getElementById("chordCard").classList.toggle("fullscreen");
+function detectScale(){
+ if(!chords.length)return;
+ const root=chords[0].chord.replace('m','');
+ detectedScale=root;
+ detected.textContent='Scale: '+root;
+ scaleSelect.value=root;
 }
+
+function applyScale(){
+ if(!detectedScale)return;
+ const target=scaleSelect.value;
+ const shift=(NOTES.indexOf(target)-NOTES.indexOf(detectedScale)+12)%12;
+ currentShift=shift;
+ chords=originalChords.map(c=>({time:c.time,chord:transpose(c.chord,shift)}));
+ render();
+}
+
+function resetScale(){
+ chords=JSON.parse(JSON.stringify(originalChords));
+ render();
+}
+
+function transpose(chord,shift){
+ const m=chord.endsWith('m');
+ const root=m?chord.slice(0,-1):chord;
+ const idx=NOTES.indexOf(root);
+ if(idx<0)return chord;
+ return NOTES[(idx+shift)%12]+(m?'m':'');
+}
+
+function render(){
+ scroll.innerHTML='';list.innerHTML='';
+ chords.forEach(c=>{
+  const d=document.createElement('div');d.className='chord';d.textContent=c.chord;scroll.appendChild(d);
+  const l=document.createElement('div');l.textContent=`${format(c.time)} – ${c.chord}`;list.appendChild(l);
+ });
+}
+
+function exportJSON(){
+ const blob=new Blob([JSON.stringify({chords},null,2)],{type:'application/json'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='chords.json';a.click();
+}
+
+importJSON.onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{const j=JSON.parse(t);chords=j.chords||[];originalChords=JSON.parse(JSON.stringify(chords));detectScale();render();});};
+function setA(){loopA=audio.currentTime}
+function setB(){loopB=audio.currentTime}
+function toggleLoop(){loop=!loop;loopBtn.textContent=loop?'🔁 On':'🔁 Off'}
+function toggleFull(){chordCard.classList.toggle('fullscreen')}
+function format(t){const m=Math.floor(t/60);const s=Math.floor(t%60).toString().padStart(2,'0');return `${m}:${s}`}
 </script>
-
 </body>
 </html>
