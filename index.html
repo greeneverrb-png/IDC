@@ -15,7 +15,7 @@
 
 body{
   margin:0;
-  font-family:system-ui, sans-serif;
+  font-family:system-ui,sans-serif;
   background:var(--bg);
   color:white;
 }
@@ -27,116 +27,48 @@ header{
   font-weight:600;
 }
 
-.container{
-  padding:14px;
-  max-width:900px;
-  margin:auto;
-}
+.container{max-width:900px;margin:auto;padding:14px;}
+.card{background:var(--card);border-radius:14px;padding:16px;margin-bottom:14px;}
 
-.card{
-  background:var(--card);
-  border-radius:14px;
-  padding:16px;
-  margin-bottom:14px;
-}
-
-input[type=file]{
-  width:100%;
+button,select,input[type=file]{
   background:#22286a;
   border:none;
-  padding:12px;
   border-radius:10px;
   color:white;
-}
-
-/* CONTROLS */
-.controls{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  align-items:center;
-}
-
-button, select{
-  background:#22286a;
-  border:none;
   padding:14px 18px;
-  border-radius:10px;
-  color:white;
-  cursor:pointer;
   font-size:16px;
 }
 
-button:disabled{
-  opacity:.4;
-  cursor:not-allowed;
-}
-
-button:hover:not(:disabled){ background:#3139a8; }
-
-select{
-  min-width:120px;
-  font-size:16px;
-}
-
-/* PROGRESS */
-.progress input{ width:100%; }
-
-.time{
-  font-size:12px;
-  color:var(--muted);
-  display:flex;
-  justify-content:space-between;
-}
-
-/* CHORD VIEW */
-.chord-box{ position:relative; }
-
-.full-btn{
-  position:absolute;
-  top:10px;
-  right:10px;
-  font-size:12px;
-  padding:8px 10px;
-}
+button:disabled{opacity:.4}
+.controls{display:flex;gap:10px;flex-wrap:wrap}
 
 .chords{
   height:160px;
   background:#060914;
   border-radius:12px;
-  overflow:hidden;
   display:flex;
   align-items:center;
+  overflow:hidden;
 }
 
 .scroll{
   display:flex;
-  gap:50px;
+  gap:60px;
   padding-left:20px;
 }
 
-.scroll.playing{
-  animation: scroll 18s linear infinite;
-}
-
 .chord{
-  font-size:34px;
+  font-size:36px;
   font-weight:700;
-  color:#7a80b5;
+  color:#6c72a8;
 }
 
 .chord.active{
   color:var(--accent);
-  transform:scale(1.4);
-  text-shadow:0 0 12px rgba(0,224,255,.6);
+  transform:scale(1.5);
+  text-shadow:0 0 14px rgba(0,224,255,.6);
 }
 
-@keyframes scroll{
-  from{ transform:translateX(0); }
-  to{ transform:translateX(-50%); }
-}
-
-/* FULLSCREEN */
 .fullscreen{
   position:fixed;
   inset:0;
@@ -145,9 +77,9 @@ select{
   padding:20px;
 }
 
-.fullscreen .chords{ height:100%; }
-.fullscreen .chord{ font-size:64px; }
-.fullscreen .scroll.playing{ animation-duration:28s; }
+.fullscreen .chord{font-size:70px}
+
+.time{font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
 </style>
 </head>
 
@@ -157,55 +89,37 @@ select{
 
 <div class="container">
 
-  <!-- Upload -->
-  <div class="card">
-    <input type="file" id="file" accept=".mp3">
+<div class="card">
+  <input type="file" id="file" accept=".mp3">
+</div>
+
+<div class="card">
+  <div class="controls">
+    <button id="play" disabled>▶️</button>
+    <button id="loopA">Set A</button>
+    <button id="loopB">Set B</button>
+    <button id="loopToggle">🔁 Off</button>
+
+    <select id="scale">
+      <option>C</option><option>C#</option><option>D</option><option>D#</option>
+      <option>E</option><option>F</option><option>F#</option><option>G</option>
+      <option>G#</option><option>A</option><option>A#</option><option>B</option>
+      <option>Cm</option><option>C#m</option><option>Dm</option><option>D#m</option>
+      <option>Em</option><option>Fm</option><option>F#m</option><option>Gm</option>
+      <option>G#m</option><option>Am</option><option>A#m</option><option>Bm</option>
+    </select>
   </div>
 
-  <!-- Player -->
-  <div class="card">
-    <div class="controls">
-      <button id="rew" onclick="rewind()" disabled>⏪</button>
-      <button id="play" onclick="playPause()" disabled>▶️</button>
-      <button id="fwd" onclick="forward()" disabled>⏩</button>
-      <button id="mute" onclick="mute()" disabled>🔇</button>
+  <input type="range" id="seek" value="0">
+  <div class="time"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+</div>
 
-      <button id="loopBtn" onclick="toggleLoop()">🔁 Off</button>
-
-      <select>
-        <option>C</option><option>D</option><option>E</option>
-        <option>F</option><option>G</option>
-        <option>A</option><option>B</option>
-        <option selected>C#m</option>
-      </select>
-    </div>
-
-    <div class="progress">
-      <input type="range" id="seek" value="0">
-      <div class="time">
-        <span id="cur">0:00</span>
-        <span id="dur">0:00</span>
-      </div>
-    </div>
+<div class="card" id="chordCard">
+  <button onclick="toggleFull()">⛶ Full</button>
+  <div class="chords">
+    <div class="scroll" id="scroll"></div>
   </div>
-
-  <!-- Chords -->
-  <div class="card chord-box" id="chordCard">
-    <button class="full-btn" onclick="toggleFull()">⛶ Full</button>
-
-    <div class="chords">
-      <div class="scroll" id="scroll">
-        <div class="chord active">C#m</div>
-        <div class="chord">A</div>
-        <div class="chord">E</div>
-        <div class="chord">B</div>
-        <div class="chord">C#m</div>
-        <div class="chord">A</div>
-        <div class="chord">E</div>
-        <div class="chord">B</div>
-      </div>
-    </div>
-  </div>
+</div>
 
 </div>
 
@@ -213,68 +127,89 @@ select{
 
 <script>
 const audio = document.getElementById("audio");
-const file = document.getElementById("file");
+const playBtn = document.getElementById("play");
+const scroll = document.getElementById("scroll");
 const seek = document.getElementById("seek");
 const cur = document.getElementById("cur");
 const dur = document.getElementById("dur");
-const scroll = document.getElementById("scroll");
 
-const controls = ["rew","play","fwd","mute"].map(id=>document.getElementById(id));
-const playBtn = document.getElementById("play");
-const loopBtn = document.getElementById("loopBtn");
+let loopA=null, loopB=null, loopOn=false;
 
-let loop = false;
+/* EXACT CHORD TIMELINE (sample) */
+const chordTimeline = [
+  {time:0,chord:"C#m"},
+  {time:12,chord:"A"},
+  {time:24,chord:"E"},
+  {time:36,chord:"B"},
+];
 
-/* LOAD */
-file.onchange = e=>{
-  const f = e.target.files[0];
-  if(!f || !f.name.toLowerCase().endsWith(".mp3")){
-    alert("MP3 file matra upload garnus");
-    return;
-  }
-  audio.src = URL.createObjectURL(f);
+/* Load */
+file.onchange=e=>{
+  const f=e.target.files[0];
+  if(!f)return;
+  audio.src=URL.createObjectURL(f);
   audio.load();
 };
 
-/* ENABLE AFTER LOAD */
-audio.onloadedmetadata = ()=>{
-  dur.textContent = format(audio.duration);
-  controls.forEach(b=>b.disabled=false);
+/* Ready */
+audio.onloadedmetadata=()=>{
+  dur.textContent=format(audio.duration);
+  playBtn.disabled=false;
 };
 
-/* PLAY / PAUSE */
-function playPause(){
+/* Build chords ONLY when play */
+function buildChords(){
+  scroll.innerHTML="";
+  chordTimeline.forEach(c=>{
+    const d=document.createElement("div");
+    d.className="chord";
+    d.textContent=c.chord;
+    scroll.appendChild(d);
+  });
+}
+
+/* Play */
+playBtn.onclick=()=>{
   if(audio.paused){
+    if(!scroll.children.length) buildChords();
     audio.play();
     playBtn.textContent="⏸";
-    scroll.classList.add("playing");
   }else{
     audio.pause();
     playBtn.textContent="▶️";
-    scroll.classList.remove("playing");
   }
-}
-
-/* LOOP */
-function toggleLoop(){
-  loop = !loop;
-  audio.loop = loop;
-  loopBtn.textContent = loop ? "🔁 On" : "🔁 Off";
-}
-
-/* TIME */
-audio.ontimeupdate = ()=>{
-  seek.value = (audio.currentTime/audio.duration)*100 || 0;
-  cur.textContent = format(audio.currentTime);
 };
 
-seek.oninput = ()=>{
-  audio.currentTime = (seek.value/100)*audio.duration;
+/* Sync */
+audio.ontimeupdate=()=>{
+  seek.value=(audio.currentTime/audio.duration)*100;
+  cur.textContent=format(audio.currentTime);
+
+  const chords=[...scroll.children];
+  chords.forEach(c=>c.classList.remove("active"));
+
+  for(let i=chordTimeline.length-1;i>=0;i--){
+    if(audio.currentTime>=chordTimeline[i].time){
+      chords[i]?.classList.add("active");
+      scroll.style.transform=`translateX(${-i*120}px)`;
+      break;
+    }
+  }
+
+  if(loopOn && loopB && audio.currentTime>=loopB){
+    audio.currentTime=loopA;
+  }
 };
 
-function rewind(){ audio.currentTime=Math.max(0,audio.currentTime-2); }
-function forward(){ audio.currentTime=Math.min(audio.duration,audio.currentTime+2); }
-function mute(){ audio.muted=!audio.muted; }
+/* Loop A/B */
+loopA.onclick=()=>loopA=audio.currentTime;
+loopB.onclick=()=>loopB=audio.currentTime;
+loopToggle.onclick=()=>{
+  loopOn=!loopOn;
+  loopToggle.textContent=loopOn?"🔁 On":"🔁 Off";
+};
+
+seek.oninput=()=>audio.currentTime=(seek.value/100)*audio.duration;
 
 function format(t){
   const m=Math.floor(t/60);
