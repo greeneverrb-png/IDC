@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Identify Chords & Tempo - Final</title>
+<title>Identify Chords & Beat-Synced Tempo</title>
 <style>
 body{margin:0;background:#0b0e1a;color:white;font-family:system-ui,sans-serif}
 header{text-align:center;padding:12px;font-size:18px;font-weight:600}
@@ -13,8 +13,8 @@ button,input,select{background:#22286a;border:none;border-radius:10px;color:whit
 button:disabled{opacity:.4}
 .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .chords{height:160px;background:#050714;border-radius:12px;display:flex;align-items:center;overflow:hidden;position:relative}
-.scroll{display:flex;gap:60px;padding-left:20px;transition:transform .2s}
-.chord{font-size:34px;color:#777db8;font-weight:700}
+.scroll{display:flex;gap:60px;padding-left:20px;transition:transform .2s ease}
+.chord{font-size:34px;color:#777db8;font-weight:700;transition:all .3s ease}
 .chord.active{color:#00e0ff;transform:scale(1.5);text-shadow:0 0 14px rgba(0,224,255,.6)}
 .fullscreen{position:fixed;inset:0;background:black;z-index:999;padding:20px}
 .fullscreen .chord{font-size:70px}
@@ -24,7 +24,7 @@ button:disabled{opacity:.4}
 </style>
 </head>
 <body>
-<header>🎸 Identify Chords & Tempo</header>
+<header>🎸 Identify Chords & Tempo Beat</header>
 <div class="container">
 <div class="card">
   <input type="file" id="audioFile" accept=".mp3">
@@ -77,11 +77,13 @@ let detectedScale='C';
 let currentShift=0;
 let loopA=null, loopB=null, loop=false;
 let tempoActive=false;
-let tempoInterval=null;
 let bpm=90;
+let audioCtx=null; let tickOscillator=null;
 
+// populate scale select
 NOTES.forEach(n=>{const o=document.createElement('option'); o.value=n; o.textContent=n; scaleSelect.appendChild(o);});
 
+// handle file upload
 audioFile.onchange=e=>{
  const file=e.target.files[0];
  if(!file) return;
@@ -90,7 +92,7 @@ audioFile.onchange=e=>{
  chords=[]; originalChords=[]; scroll.innerHTML=''; playBtn.disabled=true;
  detected.textContent='Scale: detecting…';
  tempoDisplay.textContent='- BPM'; tempoActive=false;
- clearInterval(tempoInterval);
+ stopTempo();
 };
 
 audio.onloadedmetadata=()=>{
@@ -172,22 +174,46 @@ function setA(){loopA=audio.currentTime}
 function setB(){loopB=audio.currentTime}
 function toggleLoop(){loop=!loop; loopBtn.textContent=loop?'🔁 On':'🔁 Off';}
 function toggleFull(){chordCard.classList.toggle('fullscreen');}
-
 function format(t){const m=Math.floor(t/60); const s=Math.floor(t%60).toString().padStart(2,'0'); return `${m}:${s}`;}
 
-// tempo detection button
+// Tempo detection + tick-tock play
+function startTempo(){
+ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+ tempoActive=true;
+ bpm=Math.floor(90 + Math.random()*60); // placeholder, replace with actual BPM detection
+ tempoDisplay.textContent=bpm+' BPM';
+ tickOscillator=audioCtx.createOscillator();
+ tickOscillator.frequency.value=1000;
+ tickOscillator.connect(audioCtx.destination);
+ tickOscillator.start();
+ tickOscillator.stop(audioCtx.currentTime+0.05);
+ tempoInterval=setInterval(()=>{
+  if(!audio.paused){
+   const osc=audioCtx.createOscillator(); osc.frequency.value=1000;
+   osc.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime+0.05);
+   highlightChordBeat();
+  }
+ },60000/bpm);
+}
+function stopTempo(){
+ clearInterval(tempoInterval); tempoActive=false; tempoDisplay.textContent='- BPM';
+}
 tempoBtn.onclick=()=>{
- if(!tempoActive){
-  bpm=Math.floor(60 + Math.random()*60); // placeholder approx tempo
-  tempoDisplay.textContent=bpm+' BPM';
-  tempoInterval=setInterval(()=>{if(!audio.paused){console.log('tick')}} ,60000/bpm);
-  tempoActive=true;
- } else {
-  clearInterval(tempoInterval);
-  tempoDisplay.textContent='- BPM';
-  tempoActive=false;
+ if(!tempoActive) startTempo(); else stopTempo();
+}
+
+function highlightChordBeat(){
+ const items=[...scroll.children];
+ const currentTime=audio.currentTime;
+ for(let i=chords.length-1;i>=0;i--){
+  if(currentTime>=chords[i].time){
+   items.forEach(x=>x.classList.remove('active'));
+   items[i]?.classList.add('active');
+   scroll.style.transform=`translateX(${-i*120}px)`;
+   break;
+  }
  }
-};
+}
 </script>
 </body>
 </html>
