@@ -131,7 +131,7 @@ function generateApproxChords(){
  for(let t=0; t<audio.duration; t+=4){
   const chord=NOTES[Math.floor(Math.random()*NOTES.length)];
   chords.push({time:t,chord:chord});
-  const d=document.createElement('div'); d.className='chord'; d.textContent=chord; scroll.appendChild(d);
+  const d=document.createElement('div'); d.className='chord'; d.textContent=c?c.chord:chord; scroll.appendChild(d);
  }
  originalChords=JSON.parse(JSON.stringify(chords));
 }
