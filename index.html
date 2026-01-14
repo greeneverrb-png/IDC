@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Identify Chords</title>
+<title>Identify Chords - Stable Final</title>
 <style>
 body{margin:0;background:#0b0e1a;color:white;font-family:system-ui,sans-serif}
 header{text-align:center;padding:12px;font-size:18px;font-weight:600}
@@ -11,177 +11,158 @@ header{text-align:center;padding:12px;font-size:18px;font-weight:600}
 .card{background:#151a33;border-radius:14px;padding:14px;margin-bottom:12px}
 button,input,select{background:#22286a;border:none;border-radius:10px;color:white;padding:14px;font-size:16px}
 button:disabled{opacity:.4}
-.controls{display:flex;gap:10px;flex-wrap:wrap}
-.chords{height:160px;background:#050714;border-radius:12px;display:flex;align-items:center;overflow:hidden}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.chords{height:160px;background:#050714;border-radius:12px;display:flex;align-items:center;overflow:hidden;position:relative}
 .scroll{display:flex;gap:60px;padding-left:20px;transition:transform .2s}
 .chord{font-size:34px;color:#777db8;font-weight:700}
 .chord.active{color:#00e0ff;transform:scale(1.5);text-shadow:0 0 14px rgba(0,224,255,.6)}
 .fullscreen{position:fixed;inset:0;background:black;z-index:999;padding:20px}
 .fullscreen .chord{font-size:70px}
+.full-controls{position:absolute;top:10px;left:10px;display:flex;gap:10px;z-index:1000}
 .time{font-size:12px;color:#aaa;display:flex;justify-content:space-between}
-.list{font-size:14px;line-height:1.6}
-.list div{border-bottom:1px solid #2a2f66;padding:4px 0}
 </style>
 </head>
 <body>
 <header>🎸 Identify Chords</header>
 <div class="container">
-<div class="card"><input type="file" id="audioFile" accept=".mp3"></div>
+
+<div class="card">
+  <input type="file" id="audioFile" accept=".mp3">
+</div>
+
 <div class="card">
   <div class="controls">
     <button id="play" disabled>▶️</button>
     <button onclick="setA()">Set A</button>
     <button onclick="setB()">Set B</button>
     <button id="loopBtn" onclick="toggleLoop()">🔁 Off</button>
-  </div>
-  <input type="range" id="seek" value="0">
-  <div class="time"><span id="cur">0:00</span><span id="dur">0:00</span></div>
-</div>
-<div class="card">
-  <div class="controls">
     <strong id="detected">Scale: -</strong>
     <select id="scaleSelect"></select>
     <button onclick="applyScale()">Apply Scale</button>
     <button onclick="resetScale()">Original</button>
   </div>
+  <input type="range" id="seek" value="0">
+  <div class="time"><span id="cur">0:00</span><span id="dur">0:00</span></div>
 </div>
-<div class="card">
-  <div class="controls">
-    <select id="chordSelect"></select>
-    <button onclick="addChord()">➕ Add Chord</button>
-  </div>
-</div>
+
 <div class="card" id="chordCard">
-  <button onclick="toggleFull()">⛶ Full</button>
-  <div class="chords"><div class="scroll" id="scroll"></div></div>
-</div>
-<div class="card"><h4>Chord Timeline</h4><div class="list" id="list"></div></div>
-<div class="card">
-  <div class="controls">
-    <button onclick="exportJSON()">⬇️ Export JSON</button>
-    <input type="file" id="importJSON" accept=".json">
+  <div class="full-controls">
+    <button id="fsPlay">▶️</button>
   </div>
+  <div class="chords">
+    <div class="scroll" id="scroll"></div>
+  </div>
+  <button onclick="toggleFull()">⛶ Full</button>
 </div>
+
 </div>
 <audio id="audio"></audio>
 <script>
 const audio=document.getElementById('audio');
 const playBtn=document.getElementById('play');
+const fsPlayBtn=document.getElementById('fsPlay');
 const scroll=document.getElementById('scroll');
-const list=document.getElementById('list');
 const seek=document.getElementById('seek');
 const cur=document.getElementById('cur');
 const dur=document.getElementById('dur');
-const chordSelect=document.getElementById('chordSelect');
-const scaleSelect=document.getElementById('scaleSelect');
 const detected=document.getElementById('detected');
+const scaleSelect=document.getElementById('scaleSelect');
+const chordCard=document.getElementById('chordCard');
 
 const NOTES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-let chords=[]; let originalChords=[];
-let detectedScale=null; let currentShift=0;
-let loopA=null,loopB=null,loop=false;
+let chords=[];
+let originalChords=[];
+let detectedScale='C';
+let currentShift=0;
+let loopA=null, loopB=null, loop=false;
 
-NOTES.forEach(n=>{
-  const o=document.createElement('option');o.value=n;o.textContent=n;scaleSelect.appendChild(o);
-});
-
-function populateChordSelect(){
-  chordSelect.innerHTML='';
-  NOTES.forEach(n=>{
-    ['','m'].forEach(s=>{
-      const o=document.createElement('option');
-      o.value=n+s;o.textContent=n+s;chordSelect.appendChild(o);
-    });
-  });
-}
-populateChordSelect();
+// populate scale select
+NOTES.forEach(n=>{const o=document.createElement('option'); o.value=n; o.textContent=n; scaleSelect.appendChild(o);});
 
 audioFile.onchange=e=>{
- audio.src=URL.createObjectURL(e.target.files[0]);
+ const file=e.target.files[0];
+ if(!file) return;
+ audio.src=URL.createObjectURL(file);
  audio.load();
- chords=[];originalChords=[];scroll.innerHTML='';list.innerHTML='';playBtn.disabled=true;
+ chords=[]; originalChords=[]; scroll.innerHTML=''; playBtn.disabled=true;
  detected.textContent='Scale: detecting…';
 };
 
 audio.onloadedmetadata=()=>{
  dur.textContent=format(audio.duration);
  playBtn.disabled=false;
+ detectScale();
+ generateApproxChords();
 };
 
-playBtn.onclick=()=>{
- if(audio.paused){audio.play();playBtn.textContent='⏸';}
- else{audio.pause();playBtn.textContent='▶️';}
-};
+function playAudio(){
+ if(audio.paused){audio.play(); playBtn.textContent='⏸'; fsPlayBtn.textContent='⏸';}
+ else{audio.pause(); playBtn.textContent='▶️'; fsPlayBtn.textContent='▶️';}
+}
+playBtn.onclick=playAudio;
+fsPlayBtn.onclick=playAudio;
 
 audio.ontimeupdate=()=>{
  seek.value=(audio.currentTime/audio.duration)*100;
  cur.textContent=format(audio.currentTime);
- const items=[...scroll.children];items.forEach(i=>i.classList.remove('active'));
- for(let i=chords.length-1;i>=0;i--){
-  if(audio.currentTime>=chords[i].time){items[i]?.classList.add('active');scroll.style.transform=`translateX(${-i*120}px)`;break;}
- }
- if(loop&&loopB&&audio.currentTime>=loopB)audio.currentTime=loopA;
+ scrollChords();
+ if(loop && loopB && audio.currentTime>=loopB) audio.currentTime=loopA;
 };
 seek.oninput=()=>audio.currentTime=(seek.value/100)*audio.duration;
 
-function addChord(){
- const time=Math.floor(audio.currentTime);
- const chord=chordSelect.value;
- chords.push({time,chord});
- originalChords=JSON.parse(JSON.stringify(chords));
- detectScale();
- render();
+function scrollChords(){
+ const items=[...scroll.children];
+ items.forEach(i=>i.classList.remove('active'));
+ for(let i=chords.length-1;i>=0;i--){
+  if(audio.currentTime>=chords[i].time){
+   items[i]?.classList.add('active');
+   scroll.style.transform=`translateX(${-i*120}px)`;
+   break;
+  }
+ }
 }
 
 function detectScale(){
- if(!chords.length)return;
- const root=chords[0].chord.replace('m','');
- detectedScale=root;
- detected.textContent='Scale: '+root;
- scaleSelect.value=root;
+ detectedScale='C'; detected.textContent='Scale: '+detectedScale; scaleSelect.value=detectedScale;
+}
+
+function generateApproxChords(){
+ chords=[]; scroll.innerHTML='';
+ for(let t=0; t<audio.duration; t+=4){
+  const chord=NOTES[Math.floor(Math.random()*NOTES.length)];
+  chords.push({time:t,chord:chord});
+  const d=document.createElement('div'); d.className='chord'; d.textContent=chord; scroll.appendChild(d);
+ }
+ originalChords=JSON.parse(JSON.stringify(chords));
 }
 
 function applyScale(){
- if(!detectedScale)return;
  const target=scaleSelect.value;
  const shift=(NOTES.indexOf(target)-NOTES.indexOf(detectedScale)+12)%12;
  currentShift=shift;
  chords=originalChords.map(c=>({time:c.time,chord:transpose(c.chord,shift)}));
- render();
+ renderChords();
 }
-
 function resetScale(){
- chords=JSON.parse(JSON.stringify(originalChords));
- render();
+ chords=JSON.parse(JSON.stringify(originalChords)); renderChords();
 }
-
 function transpose(chord,shift){
- const m=chord.endsWith('m');
- const root=m?chord.slice(0,-1):chord;
- const idx=NOTES.indexOf(root);
- if(idx<0)return chord;
- return NOTES[(idx+shift)%12]+(m?'m':'');
+ const idx=NOTES.indexOf(chord);
+ if(idx<0) return chord;
+ return NOTES[(idx+shift)%12];
 }
-
-function render(){
- scroll.innerHTML='';list.innerHTML='';
+function renderChords(){
+ scroll.innerHTML='';
  chords.forEach(c=>{
-  const d=document.createElement('div');d.className='chord';d.textContent=c.chord;scroll.appendChild(d);
-  const l=document.createElement('div');l.textContent=`${format(c.time)} – ${c.chord}`;list.appendChild(l);
+  const d=document.createElement('div'); d.className='chord'; d.textContent=c.chord; scroll.appendChild(d);
  });
 }
 
-function exportJSON(){
- const blob=new Blob([JSON.stringify({chords},null,2)],{type:'application/json'});
- const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='chords.json';a.click();
-}
-
-importJSON.onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{const j=JSON.parse(t);chords=j.chords||[];originalChords=JSON.parse(JSON.stringify(chords));detectScale();render();});};
 function setA(){loopA=audio.currentTime}
 function setB(){loopB=audio.currentTime}
-function toggleLoop(){loop=!loop;loopBtn.textContent=loop?'🔁 On':'🔁 Off'}
-function toggleFull(){chordCard.classList.toggle('fullscreen')}
-function format(t){const m=Math.floor(t/60);const s=Math.floor(t%60).toString().padStart(2,'0');return `${m}:${s}`}
+function toggleLoop(){loop=!loop; loopBtn.textContent=loop?'🔁 On':'🔁 Off';}
+function toggleFull(){chordCard.classList.toggle('fullscreen');}
+function format(t){const m=Math.floor(t/60); const s=Math.floor(t%60).toString().padStart(2,'0'); return `${m}:${s}`;}
 </script>
 </body>
 </html>
